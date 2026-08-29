@@ -1,0 +1,2337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HourSpot - Smart AI-Powered Parking Platform</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#ecfdf5',
+              100: '#d1fae5',
+              400: '#34d399',
+              500: '#10b981',
+              600: '#059669',
+              700: '#047857',
+              900: '#064e3b',
+            },
+            accent: {
+              400: '#38bdf8',
+              500: '#0ea5e9',
+              600: '#0284c7',
+            }
+          },
+          animation: {
+            'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'float': 'float 4s ease-in-out infinite',
+          },
+          keyframes: {
+            float: {
+              '0%, 100%': { transform: 'translateY(0px)' },
+              '50%': { transform: 'translateY(-6px)' },
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Leaflet Maps CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- QRCode.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <style>
+    * {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.6);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(52, 211, 153, 0.4);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(52, 211, 153, 0.8);
+    }
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.84);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .glass-card {
+      background: rgba(30, 41, 59, 0.78);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glass-input {
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+    .glass-input:focus {
+      border-color: #10b981;
+      box-shadow: 0 0 12px rgba(16, 185, 129, 0.35);
+    }
+    .leaflet-popup-content-wrapper {
+      background: #0f172a !important;
+      color: #f8fafc !important;
+      border: 1px solid rgba(52, 211, 153, 0.3) !important;
+      border-radius: 14px !important;
+    }
+    .leaflet-popup-tip {
+      background: #0f172a !important;
+    }
+    /* Background Canvas overlay */
+    #scenicCanvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 0;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen relative overflow-x-hidden selection:bg-brand-500 selection:text-black">
+
+  <!-- ========================================================================= -->
+  <!-- 1. LIVE ANIMATED SCENIC BACKGROUND (Highway, Hill Station Temple, House & Car) -->
+  <!-- ========================================================================= -->
+  <canvas id="scenicCanvas"></canvas>
+  
+  <!-- Subtle Vignette & Gradient Layer -->
+  <div class="fixed inset-0 bg-gradient-to-t from-slate-950 via-transparent to-slate-950/70 pointer-events-none z-[1]"></div>
+  <div class="fixed inset-0 bg-slate-950/40 backdrop-blur-[1.5px] pointer-events-none z-[1]"></div>
+
+  <!-- Background Simulation Live Banner & Controls -->
+  <div class="fixed bottom-3 left-3 z-30 flex flex-wrap items-center gap-2 bg-slate-900/90 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-slate-700/70 shadow-2xl text-xs">
+    <span class="flex h-2.5 w-2.5 relative">
+      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+      <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+    </span>
+    <span id="animStatusText" class="text-slate-300 font-mono text-[11px] font-medium">Simulating: Highway search → House Parking</span>
+    
+    <div class="flex items-center gap-1.5 ml-2 border-l border-slate-700 pl-2">
+      <button onclick="toggleScenicMode()" title="Toggle Sunset/Night/Day Scenery" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition text-[11px] flex items-center gap-1 border border-slate-600">
+        <i data-lucide="palette" class="w-3 h-3 text-emerald-400"></i> Theme: <span id="themeBadge" class="font-bold text-emerald-400">Sunset</span>
+      </button>
+      <button onclick="resetCarAnimation()" title="Replay Car Parking Journey" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition text-[11px] flex items-center gap-1 border border-slate-600">
+        <i data-lucide="rotate-ccw" class="w-3 h-3 text-cyan-400"></i> Replay
+      </button>
+      <button onclick="openAITunerModal()" title="Tune AI Recommendation Hyperparameters" class="px-2 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 transition text-[11px] flex items-center gap-1 border border-emerald-500/40 font-bold">
+        <i data-lucide="sliders" class="w-3 h-3 text-emerald-400"></i> AI Weights
+      </button>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- 2. MAIN APPLICATION CONTENT (Z-INDEX 10) -->
+  <!-- ========================================================================= -->
+  <div class="relative z-10 min-h-screen flex flex-col">
+    
+    <!-- Top Navigation Bar -->
+    <header class="glass-panel sticky top-0 z-40 border-b border-slate-800 px-4 lg:px-8 py-3">
+      <div class="max-w-7xl mx-auto flex items-center justify-between">
+        
+        <!-- Logo -->
+        <div class="flex items-center space-x-3 cursor-pointer" onclick="navigateTo('search')">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 via-emerald-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+            <i data-lucide="map-pin" class="w-6 h-6 text-slate-950 font-black"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-xl font-black tracking-tight text-white">Hour<span class="text-emerald-400">Spot</span></span>
+              <span class="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">AI Smart Parking</span>
+            </div>
+            <p class="text-[11px] text-slate-400 hidden sm:block">Rent Empty Spaces • Book Guaranteed Parking</p>
+          </div>
+        </div>
+
+        <!-- 3-Page Navigation Tabs -->
+        <nav class="flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-800 shadow-inner">
+          <button id="nav-login" onclick="navigateTo('login')" class="nav-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition text-slate-400 hover:text-white">
+            <i data-lucide="log-in" class="w-4 h-4"></i>
+            <span>1. Login / OTP</span>
+          </button>
+          
+          <button id="nav-search" onclick="navigateTo('search')" class="nav-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition bg-emerald-500 text-slate-950 shadow-md">
+            <i data-lucide="compass" class="w-4 h-4"></i>
+            <span>2. Vehicle User</span>
+          </button>
+          
+          <button id="nav-renter" onclick="navigateTo('renter')" class="nav-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition text-slate-400 hover:text-white">
+            <i data-lucide="home" class="w-4 h-4"></i>
+            <span>3. Space Renter</span>
+          </button>
+        </nav>
+
+        <!-- Right Utilities: GitHub & Deploy Links + Profile -->
+        <div class="flex items-center space-x-2.5">
+          <!-- Vercel 1-Click Deploy Link -->
+          <a href="https://vercel.com/new/clone?repository-url=https://github.com/sujeeth-gounder/HP" target="_blank" class="hidden xl:flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-900 hover:bg-black border border-slate-700 text-slate-200 text-xs font-bold transition shadow">
+            <svg class="w-3 h-3 fill-white" viewBox="0 0 1155 1000"><path d="m577.3 0 577.4 1000H0z"/></svg>
+            <span>Deploy to Vercel</span>
+          </a>
+
+          <!-- GitHub Repo Link -->
+          <a href="https://github.com/sujeeth-gounder/HP" target="_blank" class="hidden lg:flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold transition">
+            <i data-lucide="github" class="w-3.5 h-3.5"></i>
+            <span>sujeeth-gounder/HP</span>
+          </a>
+
+          <!-- Active AI Demand Badge -->
+          <div class="hidden md:flex items-center gap-2 px-3 py-1 rounded-xl bg-slate-800/80 border border-slate-700 text-xs">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-400"></i>
+            <span class="text-slate-400">Demand:</span>
+            <span class="font-bold text-amber-400 font-mono">PEAK (1.25x)</span>
+          </div>
+
+          <!-- User State Button -->
+          <div id="authStatusBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800/90 border border-slate-700 cursor-pointer hover:border-emerald-500/50 transition" onclick="toggleUserModal()">
+            <div class="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-bold font-mono" id="userAvatarText">
+              JS
+            </div>
+            <span class="text-xs font-medium text-slate-200" id="userDisplayName">John Driver</span>
+            <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400"></i>
+          </div>
+        </div>
+
+      </div>
+    </header>
+
+    <!-- ========================================================================= -->
+    <!-- PAGE 1: LOGIN & AUTHENTICATION (EMAIL / PHONE OTP / SOCIAL) -->
+    <!-- ========================================================================= -->
+    <main id="page-login" class="page-container hidden max-w-7xl mx-auto px-4 py-8 flex-1 flex items-center justify-center">
+      <div class="w-full max-w-md">
+        
+        <div class="glass-panel p-8 rounded-3xl shadow-2xl border border-slate-700/60 relative overflow-hidden">
+          <!-- Ambient Glow decoration -->
+          <div class="absolute -top-12 -right-12 w-36 h-36 bg-emerald-500/20 rounded-full blur-2xl pointer-events-none"></div>
+          <div class="absolute -bottom-12 -left-12 w-36 h-36 bg-cyan-500/20 rounded-full blur-2xl pointer-events-none"></div>
+          
+          <div class="text-center mb-6">
+            <div class="w-14 h-14 mx-auto mb-3 rounded-2xl bg-gradient-to-tr from-emerald-600 to-cyan-500 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+              <i data-lucide="shield-check" class="w-8 h-8 text-slate-950 font-black"></i>
+            </div>
+            <h1 class="text-2xl font-black tracking-tight text-white">Welcome to HourSpot</h1>
+            <p class="text-xs text-slate-400 mt-1">Smart parking made instant, affordable, and AI-optimized</p>
+          </div>
+
+          <!-- Auth Tabs: Phone OTP vs Email ID -->
+          <div class="flex p-1 bg-slate-900/90 rounded-xl mb-6 border border-slate-800">
+            <button id="auth-tab-phone" onclick="switchAuthMethod('phone')" class="flex-1 py-2 rounded-lg text-xs font-bold transition bg-emerald-500 text-slate-950 shadow">
+              <i data-lucide="smartphone" class="w-3.5 h-3.5 inline mr-1"></i> Phone & OTP
+            </button>
+            <button id="auth-tab-email" onclick="switchAuthMethod('email')" class="flex-1 py-2 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">
+              <i data-lucide="mail" class="w-3.5 h-3.5 inline mr-1"></i> Email & Password
+            </button>
+          </div>
+
+          <!-- Role Toggle -->
+          <div class="mb-5">
+            <label class="block text-xs font-semibold text-slate-300 mb-2">I am joining as:</label>
+            <div class="grid grid-cols-2 gap-2">
+              <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-700 bg-slate-800/60 cursor-pointer hover:border-emerald-500 transition has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-500/10">
+                <input type="radio" name="authRole" value="driver" checked class="accent-emerald-500" />
+                <div>
+                  <div class="text-xs font-bold text-white flex items-center gap-1">🚗 Vehicle User</div>
+                  <div class="text-[10px] text-slate-400">Search & book spaces</div>
+                </div>
+              </label>
+
+              <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-700 bg-slate-800/60 cursor-pointer hover:border-emerald-500 transition has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-500/10">
+                <input type="radio" name="authRole" value="renter" class="accent-emerald-500" />
+                <div>
+                  <div class="text-xs font-bold text-white flex items-center gap-1">🏠 Space Owner</div>
+                  <div class="text-[10px] text-slate-400">List space & earn</div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Form 1: Phone OTP -->
+          <form id="form-phone-auth" onsubmit="handlePhoneAuth(event)" class="space-y-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Mobile Phone Number</label>
+              <div class="relative">
+                <span class="absolute left-3.5 top-2.5 text-slate-400 text-xs font-mono font-bold">+91</span>
+                <input type="tel" id="inputPhone" value="9876543210" placeholder="98765 43210" required class="w-full glass-input pl-12 pr-4 py-2.5 rounded-xl text-sm font-mono text-white placeholder-slate-500 focus:outline-none transition" />
+              </div>
+            </div>
+
+            <!-- OTP input box (Visible after Request OTP) -->
+            <div id="otpSection" class="hidden space-y-2">
+              <div class="flex justify-between items-center">
+                <label class="block text-xs font-semibold text-slate-300">Enter 6-Digit OTP</label>
+                <span class="text-[11px] text-emerald-400 font-mono" id="otpTimer">Resend in 28s</span>
+              </div>
+              <div class="flex gap-2 justify-between">
+                <input type="text" maxlength="1" value="7" class="otp-box w-11 h-11 text-center font-mono text-lg font-bold rounded-xl glass-input text-white focus:border-emerald-500 focus:outline-none" />
+                <input type="text" maxlength="1" value="4" class="otp-box w-11 h-11 text-center font-mono text-lg font-bold rounded-xl glass-input text-white focus:border-emerald-500 focus:outline-none" />
+                <input type="text" maxlength="1" value="9" class="otp-box w-11 h-11 text-center font-mono text-lg font-bold rounded-xl glass-input text-white focus:border-emerald-500 focus:outline-none" />
+                <input type="text" maxlength="1" value="2" class="otp-box w-11 h-11 text-center font-mono text-lg font-bold rounded-xl glass-input text-white focus:border-emerald-500 focus:outline-none" />
+                <input type="text" maxlength="1" value="8" class="otp-box w-11 h-11 text-center font-mono text-lg font-bold rounded-xl glass-input text-white focus:border-emerald-500 focus:outline-none" />
+                <input type="text" maxlength="1" value="1" class="otp-box w-11 h-11 text-center font-mono text-lg font-bold rounded-xl glass-input text-white focus:border-emerald-500 focus:outline-none" />
+              </div>
+              <p class="text-[11px] text-emerald-400/90 flex items-center gap-1">
+                <i data-lucide="check-circle-2" class="w-3 h-3"></i> Test OTP pre-filled: 749281
+              </p>
+            </div>
+
+            <button type="submit" id="btnPhoneSubmit" class="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-500/25 transition transform active:scale-[0.99] flex items-center justify-center gap-2">
+              <span id="phoneBtnText">Send Verification Code</span>
+              <i data-lucide="arrow-right" class="w-4 h-4"></i>
+            </button>
+          </form>
+
+          <!-- Form 2: Email Auth -->
+          <form id="form-email-auth" onsubmit="handleEmailAuth(event)" class="space-y-4 hidden">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Email ID</label>
+              <div class="relative">
+                <i data-lucide="at-sign" class="w-4 h-4 absolute left-3.5 top-3 text-slate-400"></i>
+                <input type="email" id="inputEmail" value="driver@hourspot.ai" placeholder="you@domain.com" required class="w-full glass-input pl-10 pr-4 py-2.5 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none transition" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Password</label>
+              <div class="relative">
+                <i data-lucide="lock" class="w-4 h-4 absolute left-3.5 top-3 text-slate-400"></i>
+                <input type="password" id="inputPassword" value="••••••••" placeholder="Enter password" required class="w-full glass-input pl-10 pr-4 py-2.5 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none transition" />
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between text-xs">
+              <label class="flex items-center gap-2 text-slate-400 cursor-pointer">
+                <input type="checkbox" checked class="rounded bg-slate-800 border-slate-700 text-emerald-500 focus:ring-0" />
+                <span>Remember me</span>
+              </label>
+              <a href="javascript:void(0)" onclick="alert('Demo Mode: Use quick login or Phone OTP!')" class="text-emerald-400 hover:underline">Forgot password?</a>
+            </div>
+
+            <button type="submit" class="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-500/25 transition transform active:scale-[0.99] flex items-center justify-center gap-2">
+              <span>Sign In with Email</span>
+              <i data-lucide="arrow-right" class="w-4 h-4"></i>
+            </button>
+          </form>
+
+          <!-- Fast Demo Quick Logins -->
+          <div class="mt-6 pt-5 border-t border-slate-800">
+            <div class="text-[11px] text-center text-slate-400 uppercase tracking-wider mb-3">Or 1-Click Instant Demo Login:</div>
+            <div class="grid grid-cols-2 gap-2">
+              <button onclick="quickLogin('driver')" class="py-2 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-slate-200 transition flex items-center justify-center gap-1.5">
+                <i data-lucide="car" class="w-3.5 h-3.5 text-cyan-400"></i> As Vehicle User
+              </button>
+              <button onclick="quickLogin('renter')" class="py-2 px-3 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-slate-200 transition flex items-center justify-center gap-1.5">
+                <i data-lucide="home" class="w-3.5 h-3.5 text-emerald-400"></i> As Space Owner
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </main>
+
+    <!-- ========================================================================= -->
+    <!-- PAGE 2: USER / VEHICLE DRIVER (SEARCH, AI RECOMMENDATIONS & BOOKING) -->
+    <!-- ========================================================================= -->
+    <main id="page-search" class="page-container max-w-7xl mx-auto px-4 lg:px-6 py-6 flex-1 flex flex-col gap-6">
+      
+      <!-- Top Hero / Search Banner with AI Highlights -->
+      <section class="glass-panel p-5 rounded-3xl border border-slate-700/60 shadow-2xl relative overflow-hidden">
+        <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+          
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs font-bold flex items-center gap-1">
+                <i data-lucide="sparkles" class="w-3 h-3"></i> AI Smart Parking Engine Active
+              </span>
+              <span class="text-xs text-slate-400 hidden sm:inline">• 24 Verified Private Spaces in Temple & Hill Station Area</span>
+            </div>
+            <h2 class="text-2xl lg:text-3xl font-black text-white tracking-tight">Find & Book Guaranteed Parking</h2>
+            <p class="text-xs text-slate-300 mt-1">Rent safe driveways, shop spaces & residential lots near famous temples & hill stations.</p>
+          </div>
+
+          <!-- Location Search input & quick tags -->
+          <div class="w-full lg:w-auto flex flex-col sm:flex-row gap-2">
+            <div class="relative min-w-[310px]">
+              <i data-lucide="map-pin" class="w-4 h-4 absolute left-3.5 top-3 text-emerald-400"></i>
+              <select id="locationSelect" onchange="handleLocationChange()" class="w-full glass-input pl-10 pr-8 py-2.5 rounded-xl text-xs font-semibold text-white bg-slate-900 focus:outline-none cursor-pointer">
+                <option value="temple">🛕 Sri Venkateswara Temple, Tirumala (Hilltop)</option>
+                <option value="madurai">🛕 Meenakshi Amman Temple, Madurai</option>
+                <option value="ooty">🌲 Ooty Botanical Hills & Upper Mall Road</option>
+                <option value="shimla">🌲 Shimla Ridge & Jakhu Hill Station</option>
+                <option value="kedarnath">🏞️ Kedarnath Valley Base Station</option>
+                <option value="market">🛍️ Central Commercial Bazaar</option>
+              </select>
+            </div>
+
+            <button onclick="triggerRadarScan()" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20 transition flex items-center justify-center gap-2">
+              <i data-lucide="radar" class="w-4 h-4 animate-spin"></i> Scan Nearby
+            </button>
+          </div>
+
+        </div>
+
+        <!-- Filter & Control Bar -->
+        <div class="mt-4 pt-4 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3">
+          
+          <!-- Vehicle Types -->
+          <div class="flex items-center gap-1.5 bg-slate-900/80 p-1 rounded-xl border border-slate-800">
+            <button onclick="filterVehicle('all')" id="vf-all" class="vehicle-filter-btn px-3 py-1 rounded-lg text-xs font-semibold bg-emerald-500 text-slate-950">All</button>
+            <button onclick="filterVehicle('car')" id="vf-car" class="vehicle-filter-btn px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white flex items-center gap-1">
+              <i data-lucide="car" class="w-3.5 h-3.5"></i> Cars
+            </button>
+            <button onclick="filterVehicle('bike')" id="vf-bike" class="vehicle-filter-btn px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white flex items-center gap-1">
+              <i data-lucide="bike" class="w-3.5 h-3.5"></i> Bikes
+            </button>
+            <button onclick="filterVehicle('ev')" id="vf-ev" class="vehicle-filter-btn px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white flex items-center gap-1">
+              <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-400"></i> EV
+            </button>
+          </div>
+
+          <!-- Feature Quick Toggles -->
+          <div class="flex flex-wrap items-center gap-2">
+            <button onclick="toggleFilter('cctv')" id="ft-cctv" class="filter-toggle px-2.5 py-1 rounded-lg text-xs bg-slate-800/80 text-slate-300 border border-slate-700 hover:border-slate-500 transition flex items-center gap-1">
+              <i data-lucide="video" class="w-3 h-3 text-cyan-400"></i> CCTV
+            </button>
+            <button onclick="toggleFilter('covered')" id="ft-covered" class="filter-toggle px-2.5 py-1 rounded-lg text-xs bg-slate-800/80 text-slate-300 border border-slate-700 hover:border-slate-500 transition flex items-center gap-1">
+              <i data-lucide="umbrella" class="w-3 h-3 text-purple-400"></i> Covered
+            </button>
+            <button onclick="toggleFilter('guard')" id="ft-guard" class="filter-toggle px-2.5 py-1 rounded-lg text-xs bg-slate-800/80 text-slate-300 border border-slate-700 hover:border-slate-500 transition flex items-center gap-1">
+              <i data-lucide="shield" class="w-3 h-3 text-emerald-400"></i> Guard
+            </button>
+            <button onclick="toggleFilter('topAI')" id="ft-topAI" class="filter-toggle px-2.5 py-1 rounded-lg text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:border-emerald-400 transition flex items-center gap-1 font-semibold">
+              <i data-lucide="award" class="w-3 h-3 text-emerald-400"></i> Top AI Match (>90%)
+            </button>
+          </div>
+
+          <!-- Sort Dropdown & AI Tuner Button -->
+          <div class="flex items-center gap-2 text-xs">
+            <span class="text-slate-400">Sort:</span>
+            <select id="sortSelect" onchange="renderSpacesList()" class="glass-input px-2.5 py-1 rounded-lg text-xs text-white bg-slate-900 border border-slate-700 focus:outline-none">
+              <option value="ai">✨ AI Match Score (High to Low)</option>
+              <option value="distance">📍 Distance (Nearest First)</option>
+              <option value="price_asc">💰 Price (Low to High)</option>
+              <option value="rating">⭐ Highest Rated</option>
+            </select>
+            <button onclick="openAITunerModal()" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-emerald-400 text-xs font-bold flex items-center gap-1">
+              <i data-lucide="sliders" class="w-3 h-3"></i> Weights
+            </button>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- Main Dual Grid: Parking Space Listings + Interactive Leaflet Map -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        <!-- Left Column: Parking Spaces List with AI Badges (7 Cols) -->
+        <div class="lg:col-span-7 space-y-4">
+          
+          <div class="flex items-center justify-between px-1">
+            <div class="text-xs font-bold text-slate-300">
+              Showing <span id="visibleCount" class="text-emerald-400 font-mono">6</span> Available Spaces
+            </div>
+            <div class="text-[11px] text-slate-400">
+              Live updates every 30s • Guaranteed Spot
+            </div>
+          </div>
+
+          <!-- Container for Dynamic Space Cards -->
+          <div id="spacesContainer" class="space-y-3.5">
+            <!-- Dynamically populated via JavaScript -->
+          </div>
+
+        </div>
+
+        <!-- Right Column: Interactive Map & Live AI Insight Card (5 Cols) -->
+        <div class="lg:col-span-5 space-y-4 sticky top-20">
+          
+          <!-- Leaflet Map Container -->
+          <div class="glass-panel p-3 rounded-3xl border border-slate-700/70 shadow-2xl overflow-hidden">
+            <div class="flex items-center justify-between pb-2 px-2 border-b border-slate-800/80 mb-2">
+              <div class="flex items-center gap-2">
+                <i data-lucide="map" class="w-4 h-4 text-emerald-400"></i>
+                <span class="text-xs font-bold text-white">Live Spatial Map & Radar</span>
+              </div>
+              <span class="text-[10px] text-emerald-400 font-mono font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                GPS SYNC ACTIVE
+              </span>
+            </div>
+
+            <!-- The actual Map Div -->
+            <div id="map" class="w-full h-80 rounded-2xl border border-slate-800 z-10"></div>
+
+            <div class="mt-2.5 px-2 flex items-center justify-between text-[11px] text-slate-400">
+              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span> Private House</span>
+              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-cyan-500 inline-block"></span> Shop / Commercial</span>
+              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-500 inline-block"></span> EV Station</span>
+            </div>
+          </div>
+
+          <!-- AI Recommendation Model Breakdown Box -->
+          <div class="glass-card p-4 rounded-3xl border border-emerald-500/30 bg-gradient-to-br from-slate-900/90 to-slate-950/90">
+            <div class="flex items-start justify-between">
+              <div class="flex items-center gap-2">
+                <div class="p-2 rounded-xl bg-emerald-500/20 text-emerald-400">
+                  <i data-lucide="cpu" class="w-5 h-5"></i>
+                </div>
+                <div>
+                  <h4 class="text-xs font-bold text-white">AIML Recommendation Engine</h4>
+                  <p class="text-[10px] text-slate-400">Multi-Objective Utility Optimization</p>
+                </div>
+              </div>
+              <button onclick="openAITunerModal()" class="text-xs font-mono font-bold text-emerald-400 hover:underline">
+                Tune Model
+              </button>
+            </div>
+
+            <div class="mt-3 space-y-2 text-xs">
+              <div class="flex justify-between text-[11px] text-slate-300">
+                <span>Distance Penalty (\(w_d\)): <span id="lbl-wd" class="font-mono text-emerald-400 font-bold">35%</span></span>
+                <span class="text-emerald-400 font-mono font-bold">Optimal Walk</span>
+              </div>
+              <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                <div id="bar-wd" class="bg-emerald-500 h-full rounded-full transition-all" style="width: 35%"></div>
+              </div>
+
+              <div class="flex justify-between text-[11px] text-slate-300">
+                <span>Price Competitiveness (\(w_p\)): <span id="lbl-wp" class="font-mono text-cyan-400 font-bold">25%</span></span>
+                <span class="text-cyan-400 font-mono font-bold">-22% vs Public Lot</span>
+              </div>
+              <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                <div id="bar-wp" class="bg-cyan-500 h-full rounded-full transition-all" style="width: 25%"></div>
+              </div>
+
+              <div class="flex justify-between text-[11px] text-slate-300">
+                <span>Security & Verified Rating (\(w_s\)): <span id="lbl-ws" class="font-mono text-purple-400 font-bold">40%</span></span>
+                <span class="text-purple-400 font-mono font-bold">CCTV + Host 4.9★</span>
+              </div>
+              <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                <div id="bar-ws" class="bg-purple-500 h-full rounded-full transition-all" style="width: 40%"></div>
+              </div>
+            </div>
+
+            <p class="mt-3 text-[10px] text-slate-400 italic">
+              "AI dynamically matches vehicle dimensions with slot clearances and adjusts ranking based on traffic congestion around the temple shrine."
+            </p>
+          </div>
+
+        </div>
+
+      </div>
+
+    </main>
+
+    <!-- ========================================================================= -->
+    <!-- PAGE 3: SPACE RENTER / HOST DASHBOARD (LIST UNUSED SPACE & EARN MONEY) -->
+    <!-- ========================================================================= -->
+    <main id="page-renter" class="page-container hidden max-w-7xl mx-auto px-4 lg:px-6 py-6 flex-1 flex flex-col gap-6">
+      
+      <!-- Host Header Banner -->
+      <section class="glass-panel p-6 rounded-3xl border border-slate-700/60 shadow-2xl relative overflow-hidden">
+        <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs font-bold">
+                🏠 Space Host Portal
+              </span>
+              <span class="text-xs text-slate-400">• Monetize Driveways, Land & Storefronts</span>
+            </div>
+            <h2 class="text-2xl lg:text-3xl font-black text-white tracking-tight">Turn Your Unused Space into Passive Income</h2>
+            <p class="text-xs text-slate-300 mt-1">List your empty area near houses, shops or temples. Set your price, approve bookings & get instant payouts.</p>
+          </div>
+
+          <!-- Quick Action: List New Space -->
+          <button onclick="openListingModal()" class="px-5 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-black text-xs shadow-xl shadow-emerald-500/25 transition transform active:scale-95 flex items-center gap-2">
+            <i data-lucide="plus-circle" class="w-4 h-4"></i> List a New Parking Space
+          </button>
+        </div>
+      </section>
+
+      <!-- Earnings & Occupancy KPI Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        <div class="glass-card p-4 rounded-2xl border border-slate-800 flex items-center justify-between">
+          <div>
+            <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Earnings</div>
+            <div class="text-2xl font-black text-white mt-1 font-mono">₹14,850</div>
+            <div class="text-[10px] text-emerald-400 flex items-center gap-1 mt-0.5 font-bold">
+              <i data-lucide="trending-up" class="w-3 h-3"></i> +32% this weekend
+            </div>
+          </div>
+          <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+            <i data-lucide="wallet" class="w-6 h-6"></i>
+          </div>
+        </div>
+
+        <div class="glass-card p-4 rounded-2xl border border-slate-800 flex items-center justify-between">
+          <div>
+            <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active Bookings</div>
+            <div class="text-2xl font-black text-white mt-1 font-mono">3 / 4 Slots</div>
+            <div class="text-[10px] text-cyan-400 flex items-center gap-1 mt-0.5 font-bold">
+              <i data-lucide="car" class="w-3 h-3"></i> 75% Occupancy
+            </div>
+          </div>
+          <div class="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+            <i data-lucide="parking-circle" class="w-6 h-6"></i>
+          </div>
+        </div>
+
+        <div class="glass-card p-4 rounded-2xl border border-slate-800 flex items-center justify-between">
+          <div>
+            <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Hours Parked</div>
+            <div class="text-2xl font-black text-white mt-1 font-mono">342 hrs</div>
+            <div class="text-[10px] text-purple-400 flex items-center gap-1 mt-0.5 font-bold">
+              <i data-lucide="clock" class="w-3 h-3"></i> 89 Completed Stays
+            </div>
+          </div>
+          <div class="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+            <i data-lucide="history" class="w-6 h-6"></i>
+          </div>
+        </div>
+
+        <div class="glass-card p-4 rounded-2xl border border-slate-800 flex items-center justify-between">
+          <div>
+            <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Host Rating</div>
+            <div class="text-2xl font-black text-white mt-1 font-mono">4.92 ★</div>
+            <div class="text-[10px] text-amber-400 flex items-center gap-1 mt-0.5 font-bold">
+              <i data-lucide="award" class="w-3 h-3"></i> Top SuperHost Status
+            </div>
+          </div>
+          <div class="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+            <i data-lucide="star" class="w-6 h-6"></i>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Two Column Layout: Space Manager + AI Parking Demand Forecaster -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        <!-- Left: Listed Spaces and Live Reservation Queue (7 Cols) -->
+        <div class="lg:col-span-7 space-y-5">
+          
+          <!-- My Listed Spaces Card -->
+          <div class="glass-panel p-5 rounded-3xl border border-slate-700/60 shadow-xl">
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center gap-2">
+                <i data-lucide="building-2" class="w-5 h-5 text-emerald-400"></i>
+                <h3 class="text-sm font-bold text-white">My Listed Parking Properties</h3>
+              </div>
+              <button onclick="openListingModal()" class="text-xs text-emerald-400 font-bold hover:underline flex items-center gap-1">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add Another
+              </button>
+            </div>
+
+            <!-- List of Host Spaces -->
+            <div id="hostSpacesContainer" class="space-y-3">
+              <!-- Dynamically populated via JS -->
+            </div>
+          </div>
+
+          <!-- Active Booking / QR Check-In Verifier Simulator -->
+          <div class="glass-panel p-5 rounded-3xl border border-slate-700/60 shadow-xl">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center gap-2">
+                <i data-lucide="qr-code" class="w-5 h-5 text-cyan-400"></i>
+                <h3 class="text-sm font-bold text-white">Live Check-In / Check-Out Scanner</h3>
+              </div>
+              <span class="text-[11px] text-slate-400">Verify Driver QR Passes</span>
+            </div>
+
+            <div class="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
+                  <i data-lucide="scan" class="w-6 h-6"></i>
+                </div>
+                <div>
+                  <div class="text-xs font-bold text-white">Test Driver Check-In Verification</div>
+                  <div class="text-[11px] text-slate-400">Scan incoming vehicle booking token: <span class="text-cyan-400 font-mono font-bold">HS-78921</span></div>
+                </div>
+              </div>
+              <button onclick="simulateHostQRScan()" class="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shadow-lg transition flex items-center gap-1.5">
+                <i data-lucide="check" class="w-3.5 h-3.5"></i> Verify Check-in
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Right: AIML Parking Demand & Dynamic Pricing Engine (5 Cols) -->
+        <div class="lg:col-span-5 space-y-5">
+          
+          <div class="glass-panel p-5 rounded-3xl border border-slate-700/60 shadow-xl">
+            
+            <div class="flex items-start justify-between mb-4">
+              <div class="flex items-center gap-2">
+                <div class="p-2 rounded-xl bg-amber-500/20 text-amber-400">
+                  <i data-lucide="brain-circuit" class="w-5 h-5"></i>
+                </div>
+                <div>
+                  <h3 class="text-sm font-bold text-white">AI Demand Prediction & Pricing</h3>
+                  <p class="text-[10px] text-slate-400">XGBoost Time-Series Surge Forecaster</p>
+                </div>
+              </div>
+              <span class="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] font-mono font-bold">
+                DEMAND SURGE
+              </span>
+            </div>
+
+            <!-- Dynamic Pricing Toggle -->
+            <div class="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 mb-4 flex items-center justify-between">
+              <div>
+                <div class="text-xs font-bold text-white flex items-center gap-1.5">
+                  <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-400"></i> Smart Dynamic Pricing
+                </div>
+                <div class="text-[10px] text-slate-400 mt-0.5">Automatically raise rate during festival & temple rush</div>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="dynamicPricingToggle" checked onchange="toggleDynamicPricing(this.checked)" class="sr-only peer">
+                <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+              </label>
+            </div>
+
+            <!-- 24-Hour Projected Demand Chart (SVG / Canvas Bar representation) -->
+            <div class="space-y-2 mb-4">
+              <div class="flex justify-between text-xs">
+                <span class="font-bold text-slate-300">24-Hour Demand Curve (Temple Zone)</span>
+                <span class="text-emerald-400 font-mono text-[11px] font-bold">Peak at 6:00 PM</span>
+              </div>
+
+              <!-- Bar Chart of hourly demand -->
+              <div class="grid grid-cols-8 gap-1.5 h-28 items-end p-2 bg-slate-950/60 rounded-xl border border-slate-800">
+                <div class="flex flex-col items-center gap-1 group relative">
+                  <div class="w-full bg-slate-700 group-hover:bg-cyan-400 transition rounded-t" style="height: 25%"></div>
+                  <span class="text-[9px] text-slate-500 font-mono">6A</span>
+                  <div class="absolute -top-7 hidden group-hover:block bg-slate-900 text-[9px] px-1.5 py-0.5 rounded border border-slate-700 whitespace-nowrap">25% Low</div>
+                </div>
+
+                <div class="flex flex-col items-center gap-1 group relative">
+                  <div class="w-full bg-cyan-600 group-hover:bg-cyan-400 transition rounded-t" style="height: 60%"></div>
+                  <span class="text-[9px] text-slate-500 font-mono">9A</span>
+                  <div class="absolute -top-7 hidden group-hover:block bg-slate-900 text-[9px] px-1.5 py-0.5 rounded border border-slate-700 whitespace-nowrap">60% Med</div>
+                </div>
+
+                <div class="flex flex-col items-center gap-1 group relative">
+                  <div class="w-full bg-cyan-500 group-hover:bg-cyan-400 transition rounded-t" style="height: 45%"></div>
+                  <span class="text-[9px] text-slate-500 font-mono">12P</span>
+                  <div class="absolute -top-7 hidden group-hover:block bg-slate-900 text-[9px] px-1.5 py-0.5 rounded border border-slate-700 whitespace-nowrap">45% Med</div>
+                </div>
+
+                <div class="flex flex-col items-center gap-1 group relative">
+                  <div class="w-full bg-emerald-500 group-hover:bg-emerald-400 transition rounded-t" style="height: 70%"></div>
+                  <span class="text-[9px] text-slate-500 font-mono">3P</span>
+                  <div class="absolute -top-7 hidden group-hover:block bg-slate-900 text-[9px] px-1.5 py-0.5 rounded border border-slate-700 whitespace-nowrap">70% High</div>
+                </div>
+
+                <div class="flex flex-col items-center gap-1 group relative">
+                  <div class="w-full bg-gradient-to-t from-amber-500 to-rose-500 group-hover:brightness-125 transition rounded-t animate-pulse" style="height: 98%"></div>
+                  <span class="text-[9px] text-amber-400 font-bold font-mono">6P</span>
+                  <div class="absolute -top-7 hidden group-hover:block bg-slate-900 text-[9px] px-1.5 py-0.5 rounded border border-amber-500 text-amber-400 whitespace-nowrap font-bold">98% PEAK (1.25x)</div>
+                </div>
+
+                <div class="flex flex-col items-center gap-1 group relative">
+                  <div class="w-full bg-emerald-500 group-hover:bg-emerald-400 transition rounded-t" style="height: 85%"></div>
+                  <span class="text-[9px] text-slate-500 font-mono">8P</span>
+                  <div class="absolute -top-7 hidden group-hover:block bg-slate-900 text-[9px] px-1.5 py-0.5 rounded border border-slate-700 whitespace-nowrap">85% High</div>
+                </div>
+
+                <div class="flex flex-col items-center gap-1 group relative">
+                  <div class="w-full bg-cyan-600 group-hover:bg-cyan-400 transition rounded-t" style="height: 40%"></div>
+                  <span class="text-[9px] text-slate-500 font-mono">10P</span>
+                  <div class="absolute -top-7 hidden group-hover:block bg-slate-900 text-[9px] px-1.5 py-0.5 rounded border border-slate-700 whitespace-nowrap">40% Med</div>
+                </div>
+
+                <div class="flex flex-col items-center gap-1 group relative">
+                  <div class="w-full bg-slate-700 group-hover:bg-cyan-400 transition rounded-t" style="height: 15%"></div>
+                  <span class="text-[9px] text-slate-500 font-mono">12A</span>
+                  <div class="absolute -top-7 hidden group-hover:block bg-slate-900 text-[9px] px-1.5 py-0.5 rounded border border-slate-700 whitespace-nowrap">15% Off-peak</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- AI Pricing Suggestion Notice -->
+            <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200 flex items-start gap-2">
+              <i data-lucide="lightbulb" class="w-4 h-4 text-amber-400 mt-0.5 shrink-0"></i>
+              <div>
+                <span class="font-bold">AI Host Recommendation:</span> Evening temple aarti attracts high influx. Your spot price will automatically adjust from <span class="font-mono font-bold text-white">₹40/hr</span> to <span class="font-mono font-bold text-emerald-400">₹50/hr</span> (+₹120 extra daily).
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </main>
+
+    <!-- ========================================================================= -->
+    <!-- MODALS: AI TUNER, BOOKING MODAL, DIGITAL QR PASS, LIST SPACE WIZARD -->
+    <!-- ========================================================================= -->
+
+    <!-- 0. AI RECOMMENDER HYPERPARAMETER TUNER MODAL -->
+    <div id="aiTunerModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md hidden">
+      <div class="glass-panel w-full max-w-md rounded-3xl p-6 border border-emerald-500/40 shadow-2xl relative">
+        <button onclick="closeAITunerModal()" class="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-full bg-slate-800/80 transition">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+
+        <div class="flex items-center gap-3 mb-4">
+          <div class="p-2.5 rounded-2xl bg-emerald-500/20 text-emerald-400">
+            <i data-lucide="sliders" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <h3 class="text-lg font-bold text-white">AI Scoring Hyperparameters</h3>
+            <p class="text-xs text-slate-400">Adjust multi-criteria utility weights in real-time</p>
+          </div>
+        </div>
+
+        <div class="space-y-4 text-xs">
+          <div>
+            <div class="flex justify-between mb-1">
+              <span class="text-slate-300 font-medium">Distance Importance (\(w_d\))</span>
+              <span id="val-wd" class="font-mono font-bold text-emerald-400">35%</span>
+            </div>
+            <input type="range" id="slider-wd" min="5" max="60" value="35" oninput="updateWeights()" class="w-full accent-emerald-500" />
+          </div>
+
+          <div>
+            <div class="flex justify-between mb-1">
+              <span class="text-slate-300 font-medium">Price Importance (\(w_p\))</span>
+              <span id="val-wp" class="font-mono font-bold text-cyan-400">25%</span>
+            </div>
+            <input type="range" id="slider-wp" min="5" max="60" value="25" oninput="updateWeights()" class="w-full accent-cyan-500" />
+          </div>
+
+          <div>
+            <div class="flex justify-between mb-1">
+              <span class="text-slate-300 font-medium">Security & CCTV Importance (\(w_s\))</span>
+              <span id="val-ws" class="font-mono font-bold text-purple-400">40%</span>
+            </div>
+            <input type="range" id="slider-ws" min="5" max="60" value="40" oninput="updateWeights()" class="w-full accent-purple-500" />
+          </div>
+
+          <div class="p-3 rounded-2xl bg-slate-900 border border-slate-800 text-[11px] text-slate-300">
+            <span class="font-bold text-emerald-400">Live Mathematical Formula:</span><br>
+            <span class="font-mono text-[10px] text-slate-400">Match Score = \(w_d(1-\hat{d}) + w_p(1-\hat{p}) + w_s(\text{Security}) + w_r(\text{Rating})\)</span>
+          </div>
+
+          <button onclick="closeAITunerModal()" class="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-lg transition">
+            Apply & Recalculate AI Match Scores
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1. DRIVER BOOKING & PAYMENT MODAL -->
+    <div id="bookingModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md hidden">
+      <div class="glass-panel w-full max-w-lg rounded-3xl p-6 border border-slate-700 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+        <button onclick="closeBookingModal()" class="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-full bg-slate-800/80 transition">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+
+        <div class="flex items-center gap-3 mb-4">
+          <div class="p-2.5 rounded-2xl bg-emerald-500/20 text-emerald-400">
+            <i data-lucide="calendar-check" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <h3 class="text-lg font-bold text-white">Reserve Parking Space</h3>
+            <p class="text-xs text-slate-400" id="bookModalSpaceName">Sharma Villa Driveway</p>
+          </div>
+        </div>
+
+        <!-- Space Quick Summary -->
+        <div class="p-3 rounded-2xl bg-slate-900/80 border border-slate-800 mb-4 flex items-center justify-between text-xs">
+          <div class="flex items-center gap-2">
+            <span id="bookModalVehicleBadge" class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20">🚗 Car Parking</span>
+            <span id="bookModalDistance" class="text-slate-300 font-mono">150m from Destination</span>
+          </div>
+          <div class="font-mono text-emerald-400 font-bold" id="bookModalRate">₹40 / hr</div>
+        </div>
+
+        <!-- Time & Duration Selection -->
+        <form onsubmit="handleConfirmBooking(event)" class="space-y-4">
+          
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Date</label>
+              <input type="date" id="bookDate" class="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none" required />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Start Time</label>
+              <input type="time" id="bookStartTime" value="14:00" class="w-full glass-input px-3 py-2 rounded-xl text-xs text-white focus:outline-none" required />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Select Duration</label>
+            <div class="grid grid-cols-4 gap-2">
+              <button type="button" onclick="selectDuration(1)" class="duration-btn py-2 rounded-xl border border-slate-700 text-xs font-bold bg-emerald-500 text-slate-950" data-hours="1">1 Hour</button>
+              <button type="button" onclick="selectDuration(2)" class="duration-btn py-2 rounded-xl border border-slate-700 text-xs font-bold text-slate-300 hover:bg-slate-800" data-hours="2">2 Hours</button>
+              <button type="button" onclick="selectDuration(4)" class="duration-btn py-2 rounded-xl border border-slate-700 text-xs font-bold text-slate-300 hover:bg-slate-800" data-hours="4">4 Hours</button>
+              <button type="button" onclick="selectDuration(8)" class="duration-btn py-2 rounded-xl border border-slate-700 text-xs font-bold text-slate-300 hover:bg-slate-800" data-hours="8">Full Day</button>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Vehicle License Plate No.</label>
+            <input type="text" id="bookPlateNumber" value="KA-05-MN-2024" placeholder="e.g. TN-07-AB-1234" required class="w-full glass-input px-3 py-2 rounded-xl text-xs font-mono uppercase text-white focus:outline-none" />
+          </div>
+
+          <!-- Price Breakdown Calculation -->
+          <div class="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-1.5 text-xs font-mono">
+            <div class="flex justify-between text-slate-400">
+              <span>Parking Fee (<span id="calcHours">1</span> hr × ₹<span id="calcRate">40</span>)</span>
+              <span class="text-white" id="calcBaseTotal">₹40.00</span>
+            </div>
+            <div class="flex justify-between text-slate-400">
+              <span>HourSpot Platform Service Fee</span>
+              <span class="text-white">₹5.00</span>
+            </div>
+            <div class="flex justify-between text-slate-400">
+              <span>AI Dynamic Discount</span>
+              <span class="text-emerald-400">-₹5.00</span>
+            </div>
+            <div class="pt-2 border-t border-slate-800 flex justify-between font-bold text-sm text-white">
+              <span>Total Payable</span>
+              <span class="text-emerald-400" id="calcGrandTotal">₹40.00</span>
+            </div>
+          </div>
+
+          <!-- Payment Simulator Options -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Payment Method</label>
+            <div class="grid grid-cols-3 gap-2">
+              <label class="flex items-center justify-center p-2 rounded-xl border border-emerald-500 bg-emerald-500/10 text-xs font-bold text-white cursor-pointer">
+                <input type="radio" name="payMethod" value="upi" checked class="hidden" />
+                <span>⚡ UPI / GPay</span>
+              </label>
+              <label class="flex items-center justify-center p-2 rounded-xl border border-slate-700 bg-slate-800/60 text-xs font-bold text-slate-300 cursor-pointer hover:border-slate-500">
+                <input type="radio" name="payMethod" value="card" class="hidden" />
+                <span>💳 Card</span>
+              </label>
+              <label class="flex items-center justify-center p-2 rounded-xl border border-slate-700 bg-slate-800/60 text-xs font-bold text-slate-300 cursor-pointer hover:border-slate-500">
+                <input type="radio" name="payMethod" value="wallet" class="hidden" />
+                <span>👛 Wallet</span>
+              </label>
+            </div>
+          </div>
+
+          <button type="submit" id="btnPayConfirm" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-sm shadow-xl shadow-emerald-500/30 transition transform active:scale-95 flex items-center justify-center gap-2">
+            <i data-lucide="lock" class="w-4 h-4"></i> Pay & Generate QR Pass
+          </button>
+        </form>
+
+      </div>
+    </div>
+
+    <!-- 2. DIGITAL QR PASS / BOOKING CONFIRMATION MODAL -->
+    <div id="qrModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md hidden">
+      <div class="glass-panel w-full max-w-sm rounded-3xl p-6 border border-emerald-500/40 shadow-2xl relative text-center">
+        
+        <button onclick="closeQRModal()" class="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-full bg-slate-800/80 transition">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+
+        <div class="w-12 h-12 mx-auto mb-2 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+          <i data-lucide="check-circle" class="w-6 h-6"></i>
+        </div>
+
+        <h3 class="text-lg font-black text-white">Booking Confirmed!</h3>
+        <p class="text-xs text-slate-400">Show this QR Pass upon arrival at the spot.</p>
+
+        <!-- Digital Ticket Card -->
+        <div class="mt-4 p-4 rounded-2xl bg-slate-900 border border-slate-700/80 shadow-inner">
+          <div class="flex justify-between items-center pb-2 border-b border-slate-800 text-[11px]">
+            <span class="text-slate-400">Pass Token:</span>
+            <span class="font-mono font-bold text-emerald-400" id="passToken">HS-94820</span>
+          </div>
+
+          <!-- QR Code Container -->
+          <div class="my-4 flex justify-center p-3 bg-white rounded-xl shadow-md w-44 h-44 mx-auto" id="qrcode"></div>
+
+          <div class="text-left space-y-1.5 text-xs">
+            <div class="flex justify-between">
+              <span class="text-slate-400">Location:</span>
+              <span class="font-bold text-white text-right" id="passLocation">Sharma Villa, Temple Rd</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-400">Vehicle:</span>
+              <span class="font-mono text-emerald-400 font-bold" id="passVehicle">KA-05-MN-2024</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-400">Valid Until:</span>
+              <span class="font-mono text-slate-200" id="passValidity">Today, 4:00 PM</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4 flex gap-2">
+          <button onclick="triggerDirections()" class="flex-1 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow transition flex items-center justify-center gap-1.5">
+            <i data-lucide="navigation" class="w-3.5 h-3.5"></i> Open Navigation
+          </button>
+          <button onclick="closeQRModal()" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 transition">
+            Done
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 3. SPACE RENTER: LIST NEW SPACE WIZARD MODAL -->
+    <div id="listingModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md hidden">
+      <div class="glass-panel w-full max-w-lg rounded-3xl p-6 border border-slate-700 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+        <button onclick="closeListingModal()" class="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-full bg-slate-800/80 transition">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+
+        <div class="flex items-center gap-3 mb-4">
+          <div class="p-2.5 rounded-2xl bg-emerald-500/20 text-emerald-400">
+            <i data-lucide="plus-circle" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <h3 class="text-lg font-bold text-white">List Your Unused Space</h3>
+            <p class="text-xs text-slate-400">Earn money from your house driveway, shop frontage, or vacant plot</p>
+          </div>
+        </div>
+
+        <form onsubmit="handleCreateListing(event)" class="space-y-4">
+          
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Property Title / Name</label>
+            <input type="text" id="newSpaceTitle" placeholder="e.g. Hilltop Villa Gated Driveway" required class="w-full glass-input px-3.5 py-2 rounded-xl text-xs text-white focus:outline-none" />
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Location / Zone</label>
+              <select id="newSpaceZone" class="w-full glass-input px-3 py-2 rounded-xl text-xs text-white bg-slate-900 focus:outline-none">
+                <option value="temple">🛕 Sri Venkateswara Temple, Tirumala</option>
+                <option value="madurai">🛕 Meenakshi Temple, Madurai</option>
+                <option value="ooty">🌲 Ooty Hill Station Mall Road</option>
+                <option value="shimla">🌲 Shimla Ridge</option>
+                <option value="kedarnath">🏞️ Kedarnath Valley Base</option>
+                <option value="market">🛍️ Central Commercial Market</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Base Price per Hour (₹)</label>
+              <input type="number" id="newSpacePrice" min="10" max="500" value="45" required class="w-full glass-input px-3.5 py-2 rounded-xl text-xs font-mono text-white focus:outline-none" />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Supported Vehicles</label>
+            <div class="grid grid-cols-3 gap-2">
+              <label class="flex items-center gap-1.5 p-2 rounded-xl border border-slate-700 bg-slate-800/60 text-xs font-medium text-white cursor-pointer has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-500/10">
+                <input type="radio" name="newVehicleType" value="car" checked class="accent-emerald-500" />
+                <span>🚗 Cars only</span>
+              </label>
+              <label class="flex items-center gap-1.5 p-2 rounded-xl border border-slate-700 bg-slate-800/60 text-xs font-medium text-white cursor-pointer has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-500/10">
+                <input type="radio" name="newVehicleType" value="bike" class="accent-emerald-500" />
+                <span>🏍️ Bikes only</span>
+              </label>
+              <label class="flex items-center gap-1.5 p-2 rounded-xl border border-slate-700 bg-slate-800/60 text-xs font-medium text-white cursor-pointer has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-500/10">
+                <input type="radio" name="newVehicleType" value="both" class="accent-emerald-500" />
+                <span>🚗+🏍️ Both</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Total Parking Slots</label>
+              <input type="number" id="newSpaceCapacity" min="1" max="20" value="3" required class="w-full glass-input px-3.5 py-2 rounded-xl text-xs font-mono text-white focus:outline-none" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Available Timings</label>
+              <input type="text" id="newSpaceTiming" value="6:00 AM - 11:00 PM" placeholder="e.g. 24/7 or 8AM - 8PM" class="w-full glass-input px-3.5 py-2 rounded-xl text-xs text-white focus:outline-none" />
+            </div>
+          </div>
+
+          <!-- Amenities Checklist -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Facilities & Security Available</label>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <label class="flex items-center gap-2 p-2 rounded-xl bg-slate-900 border border-slate-800 cursor-pointer">
+                <input type="checkbox" id="fac-cctv" checked class="rounded text-emerald-500 accent-emerald-500" />
+                <span>🛡️ 24/7 CCTV Camera</span>
+              </label>
+              <label class="flex items-center gap-2 p-2 rounded-xl bg-slate-900 border border-slate-800 cursor-pointer">
+                <input type="checkbox" id="fac-guard" checked class="rounded text-emerald-500 accent-emerald-500" />
+                <span>👮 Security Guard</span>
+              </label>
+              <label class="flex items-center gap-2 p-2 rounded-xl bg-slate-900 border border-slate-800 cursor-pointer">
+                <input type="checkbox" id="fac-covered" checked class="rounded text-emerald-500 accent-emerald-500" />
+                <span>🏠 Covered / Shade</span>
+              </label>
+              <label class="flex items-center gap-2 p-2 rounded-xl bg-slate-900 border border-slate-800 cursor-pointer">
+                <input type="checkbox" id="fac-ev" class="rounded text-emerald-500 accent-emerald-500" />
+                <span>⚡ EV Charging Port</span>
+              </label>
+            </div>
+          </div>
+
+          <button type="submit" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-black text-sm shadow-xl shadow-emerald-500/25 transition transform active:scale-95 flex items-center justify-center gap-2">
+            <i data-lucide="check" class="w-4 h-4"></i> Publish Space on HourSpot
+          </button>
+        </form>
+
+      </div>
+    </div>
+
+    <!-- Toast Notification Overlay -->
+    <div id="toast" class="fixed bottom-16 right-4 z-50 hidden transition-all duration-300 transform translate-y-4">
+      <div class="glass-panel px-4 py-3 rounded-2xl border border-emerald-500/40 shadow-2xl flex items-center gap-3 text-xs font-bold text-white">
+        <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400" id="toastIcon"></i>
+        <span id="toastMessage">Action completed successfully!</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- 3. JAVASCRIPT: CANVASES, LEAFLET MAPS, AI ENGINE & REACTIVE STATE -->
+  <!-- ========================================================================= -->
+  <script>
+    // -------------------------------------------------------------
+    // Global Application State & Seed Data
+    // -------------------------------------------------------------
+    const APP_STATE = {
+      currentPage: 'search',
+      currentUser: { name: 'John Driver', role: 'driver', phone: '9876543210' },
+      sceneryTheme: 'sunset', // 'sunset', 'night', 'day'
+      activeVehicleFilter: 'all',
+      activeFilters: { cctv: false, covered: false, guard: false, topAI: false },
+      activeSort: 'ai',
+      selectedZone: 'temple',
+      selectedDurationHours: 1,
+      activeBookingSpace: null,
+      dynamicPricingEnabled: true,
+      aiWeights: {
+        distance: 0.35,
+        price: 0.25,
+        security: 0.40
+      },
+      spaces: [
+        {
+          id: 'sp-1',
+          name: 'Tirumala Temple North Gate - Sharma Villa',
+          type: 'house',
+          address: 'Plot 14, Hill Shrine Road, Temple North Gate',
+          zone: 'temple',
+          lat: 13.6833,
+          lng: 79.3475,
+          distanceMeters: 140,
+          walkTimeMin: 2,
+          pricePerHour: 40,
+          originalPrice: 40,
+          vehicleTypes: ['car', 'bike'],
+          rating: 4.95,
+          reviewsCount: 128,
+          totalSlots: 4,
+          availableSlots: 2,
+          facilities: { cctv: true, guard: true, covered: true, ev: true },
+          hostName: 'Mr. R. Sharma (House Owner)',
+          photoUrl: 'https://images.unsplash.com/photo-1584463699039-444454790b8f?auto=format&fit=crop&w=600&q=80',
+          aiScore: 98,
+          aiReasons: ['140m walk to Temple entry', 'Covered roof + 24/7 CCTV', '30% cheaper than public lot']
+        },
+        {
+          id: 'sp-2',
+          name: 'Ooty Green Pines House Driveway',
+          type: 'house',
+          address: '42 Misty Pine Lane, Upper Hill Station',
+          zone: 'ooty',
+          lat: 13.6860,
+          lng: 79.3510,
+          distanceMeters: 280,
+          walkTimeMin: 4,
+          pricePerHour: 35,
+          originalPrice: 35,
+          vehicleTypes: ['car', 'bike'],
+          rating: 4.88,
+          reviewsCount: 94,
+          totalSlots: 3,
+          availableSlots: 1,
+          facilities: { cctv: true, guard: false, covered: true, ev: false },
+          hostName: 'Anita Menon',
+          photoUrl: 'https://images.unsplash.com/photo-1590674899484-d5640e854abe?auto=format&fit=crop&w=600&q=80',
+          aiScore: 94,
+          aiReasons: ['Scenic mountain view', 'Zero waiting queue', 'Spacious SUV parking']
+        },
+        {
+          id: 'sp-3',
+          name: 'Meenakshi Temple South Tower Courtyard',
+          type: 'house',
+          address: '18 Chithirai Street, Madurai',
+          zone: 'madurai',
+          lat: 13.6845,
+          lng: 79.3490,
+          distanceMeters: 180,
+          walkTimeMin: 2,
+          pricePerHour: 45,
+          originalPrice: 45,
+          vehicleTypes: ['car', 'bike'],
+          rating: 4.92,
+          reviewsCount: 175,
+          totalSlots: 3,
+          availableSlots: 2,
+          facilities: { cctv: true, guard: true, covered: true, ev: false },
+          hostName: 'S. Sundaram',
+          photoUrl: 'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=600&q=80',
+          aiScore: 96,
+          aiReasons: ['2 min walk to Temple Gopuram', 'CCTV & Guarded gate']
+        },
+        {
+          id: 'sp-4',
+          name: 'Shimla Ridge Mall Road Private Garage',
+          type: 'house',
+          address: '11 Jakhu Hill Road, Shimla',
+          zone: 'shimla',
+          lat: 13.6875,
+          lng: 79.3440,
+          distanceMeters: 320,
+          walkTimeMin: 5,
+          pricePerHour: 50,
+          originalPrice: 50,
+          vehicleTypes: ['car'],
+          rating: 4.85,
+          reviewsCount: 110,
+          totalSlots: 2,
+          availableSlots: 1,
+          facilities: { cctv: true, guard: true, covered: true, ev: true },
+          hostName: 'Capt. R. Verma',
+          photoUrl: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=600&q=80',
+          aiScore: 91,
+          aiReasons: ['Covered heated garage', 'Mall Road direct shortcut']
+        },
+        {
+          id: 'sp-5',
+          name: 'Kedarnath Base Camp Heli-Lane Plot',
+          type: 'land',
+          address: 'Guptkashi-Kedarnath Base Highway',
+          zone: 'kedarnath',
+          lat: 13.6790,
+          lng: 79.3560,
+          distanceMeters: 550,
+          walkTimeMin: 7,
+          pricePerHour: 30,
+          originalPrice: 30,
+          vehicleTypes: ['car', 'bike'],
+          rating: 4.78,
+          reviewsCount: 88,
+          totalSlots: 12,
+          availableSlots: 6,
+          facilities: { cctv: true, guard: true, covered: false, ev: false },
+          hostName: 'Himalayan Parking Co.',
+          photoUrl: 'https://images.unsplash.com/photo-1573348722427-f1d6819fdf98?auto=format&fit=crop&w=600&q=80',
+          aiScore: 88,
+          aiReasons: ['Large capacity for SUV/Traveler', '24/7 security watch']
+        },
+        {
+          id: 'sp-6',
+          name: 'Central Commercial Complex Basement',
+          type: 'shop',
+          address: '88 Central Bazaar Junction',
+          zone: 'market',
+          lat: 13.6810,
+          lng: 79.3420,
+          distanceMeters: 450,
+          walkTimeMin: 6,
+          pricePerHour: 45,
+          originalPrice: 45,
+          vehicleTypes: ['car'],
+          rating: 4.72,
+          reviewsCount: 210,
+          totalSlots: 10,
+          availableSlots: 5,
+          facilities: { cctv: true, guard: true, covered: true, ev: true },
+          hostName: 'Anand Enterprises',
+          photoUrl: 'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&w=600&q=80',
+          aiScore: 89,
+          aiReasons: ['High capacity', 'EV Rapid Charger available', 'Guard on duty']
+        }
+      ]
+    };
+
+    // -------------------------------------------------------------
+    // Canvas Animation Engine: Highway, Temple Hill, House & Car Flow
+    // -------------------------------------------------------------
+    const canvas = document.getElementById('scenicCanvas');
+    const ctx = canvas.getContext('2d');
+    let animWidth, animHeight;
+    let carAnim = {
+      progress: 0,
+      speed: 0.0022,
+      isPaused: false,
+      state: 'cruising'
+    };
+
+    function resizeCanvas() {
+      animWidth = canvas.width = window.innerWidth;
+      animHeight = canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    function toggleScenicMode() {
+      const modes = ['sunset', 'night', 'day'];
+      const nextIdx = (modes.indexOf(APP_STATE.sceneryTheme) + 1) % modes.length;
+      APP_STATE.sceneryTheme = modes[nextIdx];
+      const badge = document.getElementById('themeBadge');
+      if (badge) badge.innerText = APP_STATE.sceneryTheme.toUpperCase();
+      showToast(`Scenery Theme changed to: ${APP_STATE.sceneryTheme.toUpperCase()}`);
+    }
+
+    function resetCarAnimation() {
+      carAnim.progress = 0;
+      carAnim.state = 'cruising';
+      showToast("Replaying car search and parking animation...");
+    }
+
+    function renderScenicFrame() {
+      ctx.clearRect(0, 0, animWidth, animHeight);
+      const theme = APP_STATE.sceneryTheme;
+      
+      // 1. Sky Gradient
+      let skyGrad = ctx.createLinearGradient(0, 0, 0, animHeight);
+      if (theme === 'sunset') {
+        skyGrad.addColorStop(0, '#0f172a');
+        skyGrad.addColorStop(0.3, '#1e1b4b');
+        skyGrad.addColorStop(0.6, '#4c1d95');
+        skyGrad.addColorStop(0.85, '#9d174d');
+        skyGrad.addColorStop(1, '#ea580c');
+      } else if (theme === 'night') {
+        skyGrad.addColorStop(0, '#020617');
+        skyGrad.addColorStop(0.4, '#0f172a');
+        skyGrad.addColorStop(0.8, '#1e293b');
+        skyGrad.addColorStop(1, '#090d16');
+      } else { // Day
+        skyGrad.addColorStop(0, '#0284c7');
+        skyGrad.addColorStop(0.5, '#38bdf8');
+        skyGrad.addColorStop(1, '#bae6fd');
+      }
+      ctx.fillStyle = skyGrad;
+      ctx.fillRect(0, 0, animWidth, animHeight);
+
+      // Stars
+      if (theme !== 'day') {
+        ctx.fillStyle = '#ffffff';
+        for (let i = 0; i < 40; i++) {
+          let sx = (i * 97) % animWidth;
+          let sy = (i * 61) % (animHeight * 0.45);
+          let sAlpha = Math.sin(Date.now() * 0.002 + i) * 0.4 + 0.6;
+          ctx.globalAlpha = sAlpha;
+          ctx.fillRect(sx, sy, (i % 2 === 0) ? 2 : 1, (i % 2 === 0) ? 2 : 1);
+        }
+        ctx.globalAlpha = 1.0;
+      }
+
+      // 2. Mountains
+      drawMountains();
+
+      // 3. Illuminated Temple
+      drawTempleOnHill();
+
+      // 4. Highway
+      drawHighway();
+
+      // 5. Roadside House & Parking Slot
+      drawHouseAndParkingSlot();
+
+      // 6. Animated Car
+      updateAndDrawCar();
+
+      requestAnimationFrame(renderScenicFrame);
+    }
+
+    function drawMountains() {
+      const horizonY = animHeight * 0.68;
+      
+      // Far Mountain Layer
+      ctx.fillStyle = APP_STATE.sceneryTheme === 'night' ? '#090d16' : '#2e1065';
+      ctx.beginPath();
+      ctx.moveTo(0, horizonY);
+      ctx.lineTo(0, animHeight * 0.38);
+      ctx.bezierCurveTo(animWidth * 0.2, animHeight * 0.22, animWidth * 0.35, animHeight * 0.45, animWidth * 0.55, animHeight * 0.32);
+      ctx.bezierCurveTo(animWidth * 0.75, animHeight * 0.20, animWidth * 0.9, animHeight * 0.35, animWidth, animHeight * 0.38);
+      ctx.lineTo(animWidth, horizonY);
+      ctx.closePath();
+      ctx.fill();
+
+      // Nearer Mountain Layer (Hill Station Slope)
+      ctx.fillStyle = APP_STATE.sceneryTheme === 'night' ? '#0f172a' : '#1e1b4b';
+      ctx.beginPath();
+      ctx.moveTo(0, horizonY);
+      ctx.lineTo(0, animHeight * 0.48);
+      ctx.bezierCurveTo(animWidth * 0.25, animHeight * 0.35, animWidth * 0.45, animHeight * 0.52, animWidth * 0.75, animHeight * 0.42);
+      ctx.lineTo(animWidth, animHeight * 0.5);
+      ctx.lineTo(animWidth, horizonY);
+      ctx.closePath();
+      ctx.fill();
+
+      // Pine Trees along the hill ridge
+      ctx.fillStyle = '#064e3b';
+      for (let x = animWidth * 0.08; x < animWidth * 0.92; x += 32) {
+        let treeY = horizonY - 45 - Math.sin(x * 0.005) * 40;
+        drawPineTree(x, treeY, 22);
+      }
+    }
+
+    function drawPineTree(x, y, size) {
+      ctx.beginPath();
+      ctx.moveTo(x, y - size);
+      ctx.lineTo(x - size * 0.4, y);
+      ctx.lineTo(x + size * 0.4, y);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function drawTempleOnHill() {
+      const templeX = animWidth * 0.22;
+      const templeY = animHeight * 0.28;
+
+      // Temple Warm Glow
+      let glow = ctx.createRadialGradient(templeX, templeY, 5, templeX, templeY, 65);
+      glow.addColorStop(0, 'rgba(251, 191, 36, 0.65)');
+      glow.addColorStop(1, 'rgba(251, 191, 36, 0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(templeX, templeY, 65, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Temple Gopuram / Shrine Structure
+      ctx.fillStyle = '#f59e0b';
+      ctx.beginPath();
+      ctx.fillRect(templeX - 22, templeY - 10, 44, 20);
+      ctx.fillRect(templeX - 16, templeY - 25, 32, 16);
+      ctx.fillRect(templeX - 10, templeY - 40, 20, 16);
+      ctx.moveTo(templeX, templeY - 52);
+      ctx.lineTo(templeX - 4, templeY - 40);
+      ctx.lineTo(templeX + 4, templeY - 40);
+      ctx.closePath();
+      ctx.fill();
+
+      // Temple Flag
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(templeX, templeY - 52);
+      ctx.lineTo(templeX, templeY - 62);
+      ctx.lineTo(templeX + 8, templeY - 57);
+      ctx.lineTo(templeX, templeY - 53);
+      ctx.stroke();
+
+      // Milestone text
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      ctx.font = 'bold 11px Plus Jakarta Sans';
+      ctx.fillText("🛕 Famous Temple Shrine (2.5 km)", templeX - 65, templeY + 28);
+    }
+
+    function drawHighway() {
+      const roadY = animHeight * 0.72;
+      const roadHeight = animHeight * 0.28;
+
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(0, roadY, animWidth, roadHeight);
+
+      ctx.fillStyle = '#065f46';
+      ctx.fillRect(0, roadY - 12, animWidth, 12);
+
+      ctx.strokeStyle = '#94a3b8';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(0, roadY + 8);
+      ctx.lineTo(animWidth, roadY + 8);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#facc15';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([25, 20]);
+      ctx.beginPath();
+      ctx.moveTo(0, roadY + roadHeight * 0.45);
+      ctx.lineTo(animWidth, roadY + roadHeight * 0.45);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      for (let lx = animWidth * 0.15; lx < animWidth; lx += animWidth * 0.28) {
+        drawStreetLight(lx, roadY - 8);
+      }
+    }
+
+    function drawStreetLight(x, y) {
+      ctx.strokeStyle = '#64748b';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x, y - 55);
+      ctx.lineTo(x + 15, y - 62);
+      ctx.stroke();
+
+      ctx.fillStyle = '#fef08a';
+      ctx.beginPath();
+      ctx.arc(x + 15, y - 62, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      let cone = ctx.createRadialGradient(x + 15, y - 60, 2, x + 15, y + 20, 50);
+      cone.addColorStop(0, 'rgba(254, 240, 138, 0.25)');
+      cone.addColorStop(1, 'rgba(254, 240, 138, 0)');
+      ctx.fillStyle = cone;
+      ctx.beginPath();
+      ctx.moveTo(x + 15, y - 60);
+      ctx.lineTo(x - 20, y + 20);
+      ctx.lineTo(x + 50, y + 20);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function drawHouseAndParkingSlot() {
+      const houseX = animWidth * 0.68;
+      const houseY = animHeight * 0.62;
+
+      ctx.fillStyle = '#334155';
+      ctx.beginPath();
+      ctx.moveTo(houseX - 45, houseY + 40);
+      ctx.lineTo(houseX + 85, houseY + 40);
+      ctx.lineTo(houseX + 95, animHeight * 0.76);
+      ctx.lineTo(houseX - 55, animHeight * 0.76);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillRect(houseX - 40, houseY - 45, 110, 85);
+
+      ctx.fillStyle = '#b91c1c';
+      ctx.beginPath();
+      ctx.moveTo(houseX - 55, houseY - 45);
+      ctx.lineTo(houseX + 15, houseY - 80);
+      ctx.lineTo(houseX + 85, houseY - 45);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#fde047';
+      ctx.fillRect(houseX - 25, houseY - 30, 24, 24);
+      ctx.fillRect(houseX + 35, houseY - 30, 24, 24);
+      ctx.strokeStyle = '#475569';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(houseX - 25, houseY - 30, 24, 24);
+      ctx.strokeRect(houseX + 35, houseY - 30, 24, 24);
+
+      ctx.fillStyle = '#78350f';
+      ctx.fillRect(houseX + 10, houseY + 5, 20, 35);
+
+      const slotX = houseX + 80;
+      const slotY = houseY + 10;
+      ctx.strokeStyle = '#10b981';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(slotX - 10, slotY - 10, 50, 40);
+
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(houseX - 45, houseY - 95, 140, 22);
+      ctx.strokeStyle = '#10b981';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(houseX - 45, houseY - 95, 140, 22);
+
+      ctx.fillStyle = '#34d399';
+      ctx.font = 'bold 10px Plus Jakarta Sans';
+      ctx.fillText("🅿️ HourSpot Verified Space", houseX - 38, houseY - 80);
+    }
+
+    function updateAndDrawCar() {
+      const roadY = animHeight * 0.72;
+      const houseX = animWidth * 0.68;
+      const parkingTargetX = houseX + 90;
+      const parkingTargetY = animHeight * 0.64;
+
+      carAnim.progress += carAnim.speed;
+      if (carAnim.progress > 1.3) {
+        carAnim.progress = 0;
+      }
+
+      let carX, carY, carAngle = 0;
+      let statusText = document.getElementById('animStatusText');
+
+      if (carAnim.progress < 0.5) {
+        carAnim.state = 'cruising';
+        let norm = carAnim.progress / 0.5;
+        carX = norm * (houseX - 80);
+        carY = roadY + 30;
+        if (statusText) statusText.innerText = "Simulating: Highway search near temple (Looking for spot...)";
+        
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
+        ctx.lineWidth = 1.5;
+        let radarR = (Date.now() % 1200) / 1200 * 50;
+        ctx.beginPath();
+        ctx.arc(carX + 25, carY + 10, radarR, 0, Math.PI * 2);
+        ctx.stroke();
+
+      } else if (carAnim.progress < 0.75) {
+        carAnim.state = 'turning';
+        let turnNorm = (carAnim.progress - 0.5) / 0.25;
+        carX = (houseX - 80) + turnNorm * (parkingTargetX - (houseX - 80));
+        carY = (roadY + 30) - turnNorm * ((roadY + 30) - parkingTargetY);
+        carAngle = -Math.PI / 12 * (1 - turnNorm);
+        if (statusText) statusText.innerText = "Simulating: Spot Found! Turning into Sharma Villa Driveway...";
+
+      } else if (carAnim.progress <= 1.0) {
+        carAnim.state = 'parked';
+        carX = parkingTargetX;
+        carY = parkingTargetY;
+        if (statusText) statusText.innerText = "Simulating: Successfully Parked & Verified via HourSpot! 🛡️";
+
+        ctx.fillStyle = '#064e3b';
+        ctx.fillRect(carX - 40, carY - 35, 110, 20);
+        ctx.strokeStyle = '#34d399';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(carX - 40, carY - 35, 110, 20);
+
+        ctx.fillStyle = '#a7f3d0';
+        ctx.font = 'bold 9px JetBrains Mono';
+        ctx.fillText("✓ PARKED & SECURE", carX - 34, carY - 22);
+
+      } else {
+        carAnim.state = 'departing';
+        let depNorm = (carAnim.progress - 1.0) / 0.3;
+        carX = parkingTargetX + depNorm * (animWidth - parkingTargetX);
+        carY = roadY + 30;
+        if (statusText) statusText.innerText = "Simulating: Checkout complete. Next driver incoming...";
+      }
+
+      drawCar(carX, carY, carAngle, carAnim.state === 'parked', carAnim.state === 'turning');
+    }
+
+    function drawCar(x, y, angle, isParked, isTurning) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+      ctx.beginPath();
+      ctx.ellipse(20, 16, 26, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#ef4444';
+      ctx.beginPath();
+      ctx.roundRect(0, 0, 48, 16, 4);
+      ctx.fill();
+
+      ctx.fillStyle = '#dc2626';
+      ctx.beginPath();
+      ctx.moveTo(8, 0);
+      ctx.lineTo(16, -10);
+      ctx.lineTo(36, -10);
+      ctx.lineTo(42, 0);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.moveTo(18, -1);
+      ctx.lineTo(22, -8);
+      ctx.lineTo(34, -8);
+      ctx.lineTo(38, -1);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#fef08a';
+      ctx.fillRect(45, 4, 3, 6);
+
+      // Blinker light if turning
+      if (isTurning && Math.floor(Date.now() / 250) % 2 === 0) {
+        ctx.fillStyle = '#f97316';
+        ctx.beginPath();
+        ctx.arc(46, 2, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      
+      if (!isParked) {
+        let beam = ctx.createRadialGradient(48, 7, 2, 90, 7, 45);
+        beam.addColorStop(0, 'rgba(254, 240, 138, 0.5)');
+        beam.addColorStop(1, 'rgba(254, 240, 138, 0)');
+        ctx.fillStyle = beam;
+        ctx.beginPath();
+        ctx.moveTo(48, 7);
+        ctx.lineTo(100, -8);
+        ctx.lineTo(100, 22);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.arc(10, 16, 5, 0, Math.PI * 2);
+      ctx.arc(38, 16, 5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#94a3b8';
+      ctx.beginPath();
+      ctx.arc(10, 16, 2, 0, Math.PI * 2);
+      ctx.arc(38, 16, 2, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    renderScenicFrame();
+
+
+    // -------------------------------------------------------------
+    // 3-Page Navigation Logic
+    // -------------------------------------------------------------
+    function navigateTo(pageId) {
+      APP_STATE.currentPage = pageId;
+
+      document.querySelectorAll('.page-container').forEach(p => p.classList.add('hidden'));
+      
+      document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.classList.remove('bg-emerald-500', 'text-slate-950', 'shadow-md');
+        btn.classList.add('text-slate-400');
+      });
+
+      const targetPage = document.getElementById(`page-${pageId}`);
+      if (targetPage) targetPage.classList.remove('hidden');
+
+      const targetBtn = document.getElementById(`nav-${pageId}`);
+      if (targetBtn) {
+        targetBtn.classList.remove('text-slate-400');
+        targetBtn.classList.add('bg-emerald-500', 'text-slate-950', 'shadow-md');
+      }
+
+      if (pageId === 'search') {
+        setTimeout(() => {
+          if (window.leafletMap) window.leafletMap.invalidateSize();
+        }, 150);
+      } else if (pageId === 'renter') {
+        renderHostSpaces();
+      }
+
+      lucide.createIcons();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+
+    // -------------------------------------------------------------
+    // Authentication & OTP Simulator (Page 1)
+    // -------------------------------------------------------------
+    function switchAuthMethod(method) {
+      const tabPhone = document.getElementById('auth-tab-phone');
+      const tabEmail = document.getElementById('auth-tab-email');
+      const formPhone = document.getElementById('form-phone-auth');
+      const formEmail = document.getElementById('form-email-auth');
+
+      if (method === 'phone') {
+        tabPhone.className = 'flex-1 py-2 rounded-lg text-xs font-bold transition bg-emerald-500 text-slate-950 shadow';
+        tabEmail.className = 'flex-1 py-2 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white';
+        formPhone.classList.remove('hidden');
+        formEmail.classList.add('hidden');
+      } else {
+        tabEmail.className = 'flex-1 py-2 rounded-lg text-xs font-bold transition bg-emerald-500 text-slate-950 shadow';
+        tabPhone.className = 'flex-1 py-2 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white';
+        formEmail.classList.remove('hidden');
+        formPhone.classList.add('hidden');
+      }
+      lucide.createIcons();
+    }
+
+    let otpStep = 'request';
+    function handlePhoneAuth(e) {
+      e.preventDefault();
+      const phone = document.getElementById('inputPhone').value;
+      const role = document.querySelector('input[name="authRole"]:checked').value;
+
+      if (otpStep === 'request') {
+        document.getElementById('otpSection').classList.remove('hidden');
+        document.getElementById('phoneBtnText').innerText = 'Verify OTP & Enter';
+        otpStep = 'verify';
+        showToast(`SMS OTP sent to +91 ${phone}! (Code: 749281)`);
+      } else {
+        APP_STATE.currentUser = {
+          name: role === 'driver' ? 'John Driver' : 'Ramesh Space Host',
+          role: role,
+          phone: phone
+        };
+        updateUserUI();
+        showToast(`Welcome back, ${APP_STATE.currentUser.name}!`);
+        navigateTo(role === 'driver' ? 'search' : 'renter');
+        otpStep = 'request';
+      }
+    }
+
+    function handleEmailAuth(e) {
+      e.preventDefault();
+      const email = document.getElementById('inputEmail').value;
+      const role = document.querySelector('input[name="authRole"]:checked').value;
+
+      APP_STATE.currentUser = {
+        name: email.split('@')[0],
+        role: role,
+        email: email
+      };
+      updateUserUI();
+      showToast(`Signed in successfully as ${APP_STATE.currentUser.name}`);
+      navigateTo(role === 'driver' ? 'search' : 'renter');
+    }
+
+    function quickLogin(role) {
+      APP_STATE.currentUser = {
+        name: role === 'driver' ? 'John Driver' : 'Mr. R. Sharma (Host)',
+        role: role,
+        phone: '9876543210'
+      };
+      updateUserUI();
+      showToast(`Switched profile to: ${APP_STATE.currentUser.name}`);
+      navigateTo(role === 'driver' ? 'search' : 'renter');
+    }
+
+    function updateUserUI() {
+      const avatar = document.getElementById('userAvatarText');
+      const name = document.getElementById('userDisplayName');
+      if (avatar && name) {
+        avatar.innerText = APP_STATE.currentUser.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+        name.innerText = APP_STATE.currentUser.name;
+      }
+    }
+
+    function toggleUserModal() {
+      const nextRole = APP_STATE.currentUser.role === 'driver' ? 'renter' : 'driver';
+      quickLogin(nextRole);
+    }
+
+
+    // -------------------------------------------------------------
+    // AI Hyperparameter Tuner Logic
+    // -------------------------------------------------------------
+    function openAITunerModal() {
+      document.getElementById('aiTunerModal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+    function closeAITunerModal() {
+      document.getElementById('aiTunerModal').classList.add('hidden');
+    }
+
+    function updateWeights() {
+      const wd = parseInt(document.getElementById('slider-wd').value);
+      const wp = parseInt(document.getElementById('slider-wp').value);
+      const ws = parseInt(document.getElementById('slider-ws').value);
+
+      document.getElementById('val-wd').innerText = `${wd}%`;
+      document.getElementById('val-wp').innerText = `${wp}%`;
+      document.getElementById('val-ws').innerText = `${ws}%`;
+
+      document.getElementById('lbl-wd').innerText = `${wd}%`;
+      document.getElementById('lbl-wp').innerText = `${wp}%`;
+      document.getElementById('lbl-ws').innerText = `${ws}%`;
+
+      document.getElementById('bar-wd').style.width = `${wd}%`;
+      document.getElementById('bar-wp').style.width = `${wp}%`;
+      document.getElementById('bar-ws').style.width = `${ws}%`;
+
+      const total = wd + wp + ws;
+      APP_STATE.aiWeights = {
+        distance: wd / total,
+        price: wp / total,
+        security: ws / total
+      };
+
+      // Recalculate AI score for all spaces
+      APP_STATE.spaces.forEach(s => {
+        const normDist = Math.max(0, 1 - (s.distanceMeters / 1000));
+        const normPrice = Math.max(0, 1 - (s.pricePerHour / 100));
+        const securityVal = (s.facilities.cctv ? 0.4 : 0) + (s.facilities.guard ? 0.3 : 0) + (s.facilities.covered ? 0.3 : 0);
+        
+        const composite = (APP_STATE.aiWeights.distance * normDist) +
+                          (APP_STATE.aiWeights.price * normPrice) +
+                          (APP_STATE.aiWeights.security * securityVal) + 0.15; // base rating
+        s.aiScore = Math.min(99, Math.round(composite * 100));
+      });
+
+      renderSpacesList();
+    }
+
+
+    // -------------------------------------------------------------
+    // Leaflet Interactive Spatial Map
+    // -------------------------------------------------------------
+    let map;
+    let markersLayer;
+
+    function initMap() {
+      if (map) return;
+
+      map = L.map('map', {
+        zoomControl: false,
+        attributionControl: false
+      }).setView([13.6833, 79.3475], 15);
+
+      L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19
+      }).addTo(map);
+
+      markersLayer = L.layerGroup().addTo(map);
+      window.leafletMap = map;
+      updateMapMarkers();
+    }
+
+    function updateMapMarkers() {
+      if (!markersLayer) return;
+      markersLayer.clearLayers();
+
+      APP_STATE.spaces.forEach(space => {
+        const iconHtml = `
+          <div class="px-2 py-1 rounded-full bg-slate-900 border-2 border-emerald-400 text-white text-[11px] font-bold font-mono shadow-xl flex items-center gap-1 cursor-pointer transform hover:scale-110 transition">
+            <span>${space.type === 'house' ? '🏠' : (space.type === 'shop' ? '🛍️' : '🏞️')}</span>
+            <span class="text-emerald-400">₹${space.pricePerHour}</span>
+          </div>
+        `;
+        const customIcon = L.divIcon({
+          html: iconHtml,
+          className: 'custom-map-pin',
+          iconSize: [60, 24],
+          iconAnchor: [30, 12]
+        });
+
+        const marker = L.marker([space.lat, space.lng], { icon: customIcon }).addTo(markersLayer);
+        
+        const popupContent = `
+          <div class="p-2 space-y-1.5 text-xs text-white">
+            <div class="font-bold text-emerald-400">${space.name}</div>
+            <div class="text-[10px] text-slate-300">${space.address}</div>
+            <div class="flex justify-between items-center text-[11px] pt-1 border-t border-slate-700">
+              <span class="font-mono text-emerald-400 font-bold">₹${space.pricePerHour}/hr</span>
+              <span class="text-amber-400">${space.rating} ★ (${space.reviewsCount})</span>
+            </div>
+            <button onclick="openBookingModal('${space.id}')" class="w-full mt-1 py-1 px-2 rounded-lg bg-emerald-500 text-slate-950 font-bold text-center block">
+              Book Spot
+            </button>
+          </div>
+        `;
+        marker.bindPopup(popupContent);
+      });
+    }
+
+
+    // -------------------------------------------------------------
+    // Search, Filters & AI Scoring List (Page 2)
+    // -------------------------------------------------------------
+    function filterVehicle(type) {
+      APP_STATE.activeVehicleFilter = type;
+      document.querySelectorAll('.vehicle-filter-btn').forEach(btn => {
+        btn.className = 'vehicle-filter-btn px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white flex items-center gap-1';
+      });
+      const activeBtn = document.getElementById(`vf-${type}`);
+      if (activeBtn) {
+        activeBtn.className = 'vehicle-filter-btn px-3 py-1 rounded-lg text-xs font-semibold bg-emerald-500 text-slate-950 flex items-center gap-1 shadow';
+      }
+      renderSpacesList();
+    }
+
+    function toggleFilter(filterKey) {
+      APP_STATE.activeFilters[filterKey] = !APP_STATE.activeFilters[filterKey];
+      const btn = document.getElementById(`ft-${filterKey}`);
+      if (btn) {
+        if (APP_STATE.activeFilters[filterKey]) {
+          btn.classList.add('bg-emerald-500', 'text-slate-950', 'border-emerald-400');
+          btn.classList.remove('bg-slate-800/80', 'text-slate-300', 'border-slate-700');
+        } else {
+          btn.classList.remove('bg-emerald-500', 'text-slate-950', 'border-emerald-400');
+          btn.classList.add('bg-slate-800/80', 'text-slate-300', 'border-slate-700');
+        }
+      }
+      renderSpacesList();
+    }
+
+    function handleLocationChange() {
+      const zone = document.getElementById('locationSelect').value;
+      APP_STATE.selectedZone = zone;
+      showToast(`Scanning parking spaces near ${zone.toUpperCase()}...`);
+      renderSpacesList();
+    }
+
+    function triggerRadarScan() {
+      showToast("Radar scanning 1.5km radius for open private driveways...");
+      renderSpacesList();
+    }
+
+    function renderSpacesList() {
+      const container = document.getElementById('spacesContainer');
+      if (!container) return;
+
+      const sortVal = document.getElementById('sortSelect').value;
+      
+      let filtered = APP_STATE.spaces.filter(s => {
+        if (APP_STATE.activeVehicleFilter !== 'all') {
+          if (APP_STATE.activeVehicleFilter === 'ev' && !s.facilities.ev) return false;
+          if (APP_STATE.activeVehicleFilter === 'car' && !s.vehicleTypes.includes('car')) return false;
+          if (APP_STATE.activeVehicleFilter === 'bike' && !s.vehicleTypes.includes('bike')) return false;
+        }
+        if (APP_STATE.activeFilters.cctv && !s.facilities.cctv) return false;
+        if (APP_STATE.activeFilters.covered && !s.facilities.covered) return false;
+        if (APP_STATE.activeFilters.guard && !s.facilities.guard) return false;
+        if (APP_STATE.activeFilters.topAI && s.aiScore < 90) return false;
+        return true;
+      });
+
+      if (sortVal === 'ai') {
+        filtered.sort((a, b) => b.aiScore - a.aiScore);
+      } else if (sortVal === 'distance') {
+        filtered.sort((a, b) => a.distanceMeters - b.distanceMeters);
+      } else if (sortVal === 'price_asc') {
+        filtered.sort((a, b) => a.pricePerHour - b.pricePerHour);
+      } else if (sortVal === 'rating') {
+        filtered.sort((a, b) => b.rating - a.rating);
+      }
+
+      document.getElementById('visibleCount').innerText = filtered.length;
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="glass-card p-8 rounded-3xl text-center border border-slate-800 text-slate-400">
+            <i data-lucide="search-x" class="w-10 h-10 mx-auto text-slate-500 mb-2"></i>
+            <p class="text-sm font-bold text-white">No parking spots found with active filters</p>
+            <p class="text-xs mt-1">Try relaxing filters or changing vehicle types.</p>
+          </div>
+        `;
+        lucide.createIcons();
+        return;
+      }
+
+      container.innerHTML = filtered.map((space, index) => {
+        const isTopPick = index === 0 && space.aiScore >= 95;
+        return `
+          <div class="glass-panel p-4 rounded-3xl border ${isTopPick ? 'border-emerald-500/50 shadow-emerald-500/10' : 'border-slate-700/60'} shadow-xl hover:border-emerald-500/60 transition group">
+            
+            <div class="flex flex-col sm:flex-row items-start justify-between gap-3">
+              
+              <!-- Left Space Info -->
+              <div class="flex gap-3.5 flex-1">
+                <img src="${space.photoUrl}" alt="${space.name}" class="w-20 h-20 rounded-2xl object-cover border border-slate-700 shrink-0" />
+                
+                <div class="space-y-1">
+                  
+                  <div class="flex flex-wrap items-center gap-1.5">
+                    ${isTopPick ? `
+                      <span class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-extrabold tracking-wide flex items-center gap-1">
+                        <i data-lucide="sparkles" class="w-3 h-3 text-emerald-400"></i> AI TOP PICK
+                      </span>
+                    ` : ''}
+                    <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-cyan-300 border border-slate-700">
+                      ${space.aiScore}% Match
+                    </span>
+                    <span class="text-[10px] text-slate-400">• ${space.hostName}</span>
+                  </div>
+
+                  <h3 class="text-sm font-bold text-white group-hover:text-emerald-400 transition">${space.name}</h3>
+                  <p class="text-xs text-slate-300 flex items-center gap-1">
+                    <i data-lucide="map-pin" class="w-3 h-3 text-emerald-400"></i> ${space.address}
+                  </p>
+
+                  <!-- Amenities Badges -->
+                  <div class="flex flex-wrap items-center gap-1.5 pt-1 text-[11px] text-slate-400">
+                    <span class="flex items-center gap-1 text-slate-300">
+                      <i data-lucide="footprints" class="w-3 h-3 text-cyan-400"></i> ${space.distanceMeters}m (${space.walkTimeMin} min walk)
+                    </span>
+                    ${space.facilities.cctv ? '<span class="px-1.5 py-0.5 rounded bg-slate-800/80 text-cyan-300 text-[10px]">🛡️ CCTV</span>' : ''}
+                    ${space.facilities.covered ? '<span class="px-1.5 py-0.5 rounded bg-slate-800/80 text-purple-300 text-[10px]">🏠 Covered</span>' : ''}
+                    ${space.facilities.ev ? '<span class="px-1.5 py-0.5 rounded bg-slate-800/80 text-amber-300 text-[10px]">⚡ EV</span>' : ''}
+                    <span class="text-amber-400 font-bold flex items-center gap-0.5">
+                      <i data-lucide="star" class="w-3 h-3 fill-amber-400 text-amber-400"></i> ${space.rating} (${space.reviewsCount})
+                    </span>
+                  </div>
+
+                </div>
+              </div>
+
+              <!-- Right Price & Booking Action -->
+              <div class="w-full sm:w-auto flex sm:flex-col items-center sm:items-end justify-between sm:justify-center pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800 shrink-0">
+                <div class="text-left sm:text-right">
+                  <div class="text-xl font-black text-white font-mono">₹${space.pricePerHour}<span class="text-xs text-slate-400 font-normal">/hr</span></div>
+                  <div class="text-[10px] text-emerald-400 font-bold">${space.availableSlots} of ${space.totalSlots} Slots Free</div>
+                </div>
+
+                <button onclick="openBookingModal('${space.id}')" class="mt-2 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20 transition transform active:scale-95 flex items-center gap-1.5">
+                  <span>Book Space</span>
+                  <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+
+            </div>
+
+            <!-- Explainable AI Insights Drawer -->
+            <div class="mt-3 pt-2.5 border-t border-slate-800/60 flex flex-wrap items-center justify-between text-[11px]">
+              <div class="flex items-center gap-2 text-slate-400">
+                <i data-lucide="bot" class="w-3.5 h-3.5 text-emerald-400"></i>
+                <span>AI Reason: <strong class="text-slate-200">${space.aiReasons.join(' • ')}</strong></span>
+              </div>
+            </div>
+
+          </div>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+
+    // -------------------------------------------------------------
+    // Space Renter / Host Portal Logic (Page 3)
+    // -------------------------------------------------------------
+    function renderHostSpaces() {
+      const container = document.getElementById('hostSpacesContainer');
+      if (!container) return;
+
+      const hostList = APP_STATE.spaces.slice(0, 2);
+      container.innerHTML = hostList.map(s => `
+        <div class="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <img src="${s.photoUrl}" class="w-14 h-14 rounded-xl object-cover border border-slate-700" />
+            <div>
+              <div class="text-xs font-bold text-white">${s.name}</div>
+              <div class="text-[11px] text-slate-400">${s.address}</div>
+              <div class="flex items-center gap-2 text-[10px] mt-1">
+                <span class="text-emerald-400 font-mono font-bold">₹${s.pricePerHour}/hr</span>
+                <span class="text-slate-500">•</span>
+                <span class="text-cyan-400 font-bold">${s.availableSlots} free / ${s.totalSlots} capacity</span>
+              </div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold">
+              ACTIVE
+            </span>
+          </div>
+        </div>
+      `).join('');
+
+      lucide.createIcons();
+    }
+
+    function toggleDynamicPricing(enabled) {
+      APP_STATE.dynamicPricingEnabled = enabled;
+      if (enabled) {
+        APP_STATE.spaces.forEach(s => s.pricePerHour = Math.round(s.originalPrice * 1.25));
+        showToast("Dynamic Pricing ENABLED: Rates auto-adjusted for Temple peak demand (+25%)");
+      } else {
+        APP_STATE.spaces.forEach(s => s.pricePerHour = s.originalPrice);
+        showToast("Dynamic Pricing DISABLED: Standard base rates restored.");
+      }
+      renderSpacesList();
+      renderHostSpaces();
+      updateMapMarkers();
+    }
+
+    function openListingModal() {
+      document.getElementById('listingModal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+    function closeListingModal() {
+      document.getElementById('listingModal').classList.add('hidden');
+    }
+
+    function handleCreateListing(e) {
+      e.preventDefault();
+      const title = document.getElementById('newSpaceTitle').value;
+      const zone = document.getElementById('newSpaceZone').value;
+      const price = parseFloat(document.getElementById('newSpacePrice').value);
+      const capacity = parseInt(document.getElementById('newSpaceCapacity').value);
+      const vehicleType = document.querySelector('input[name="newVehicleType"]:checked').value;
+      
+      const newSpace = {
+        id: `sp-${Date.now()}`,
+        name: title,
+        type: 'house',
+        address: `Near ${zone.toUpperCase()} Approach Road`,
+        zone: zone,
+        lat: 13.6840 + (Math.random() - 0.5) * 0.005,
+        lng: 79.3480 + (Math.random() - 0.5) * 0.005,
+        distanceMeters: Math.round(Math.random() * 300 + 100),
+        walkTimeMin: 3,
+        pricePerHour: price,
+        originalPrice: price,
+        vehicleTypes: vehicleType === 'both' ? ['car', 'bike'] : [vehicleType],
+        rating: 5.0,
+        reviewsCount: 1,
+        totalSlots: capacity,
+        availableSlots: capacity,
+        facilities: {
+          cctv: document.getElementById('fac-cctv').checked,
+          guard: document.getElementById('fac-guard').checked,
+          covered: document.getElementById('fac-covered').checked,
+          ev: document.getElementById('fac-ev').checked,
+        },
+        hostName: APP_STATE.currentUser.name,
+        photoUrl: 'https://images.unsplash.com/photo-1590674899484-d5640e854abe?auto=format&fit=crop&w=600&q=80',
+        aiScore: 95,
+        aiReasons: ['Newly listed verified space', 'Instant host confirmation']
+      };
+
+      APP_STATE.spaces.unshift(newSpace);
+      closeListingModal();
+      showToast("Space Listed Successfully! Ready to accept vehicle bookings.");
+      renderSpacesList();
+      renderHostSpaces();
+      updateMapMarkers();
+    }
+
+    function simulateHostQRScan() {
+      showToast("✓ Pass HS-78921 Verified! Gate Opened & Check-In Confirmed.");
+    }
+
+
+    // -------------------------------------------------------------
+    // Booking & Digital QR Pass Logic
+    // -------------------------------------------------------------
+    function openBookingModal(spaceId) {
+      const space = APP_STATE.spaces.find(s => s.id === spaceId);
+      if (!space) return;
+
+      APP_STATE.activeBookingSpace = space;
+      document.getElementById('bookModalSpaceName').innerText = space.name;
+      document.getElementById('bookModalRate').innerText = `₹${space.pricePerHour} / hr`;
+      document.getElementById('bookModalDistance').innerText = `${space.distanceMeters}m from destination`;
+      document.getElementById('bookModalVehicleBadge').innerText = space.vehicleTypes.includes('car') ? '🚗 Car Slot' : '🏍️ Bike Slot';
+
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('bookDate').value = today;
+
+      selectDuration(1);
+      document.getElementById('bookingModal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeBookingModal() {
+      document.getElementById('bookingModal').classList.add('hidden');
+    }
+
+    function selectDuration(hours) {
+      APP_STATE.selectedDurationHours = hours;
+      document.querySelectorAll('.duration-btn').forEach(btn => {
+        if (parseInt(btn.getAttribute('data-hours')) === hours) {
+          btn.className = 'duration-btn py-2 rounded-xl border border-emerald-400 text-xs font-bold bg-emerald-500 text-slate-950';
+        } else {
+          btn.className = 'duration-btn py-2 rounded-xl border border-slate-700 text-xs font-bold text-slate-300 hover:bg-slate-800';
+        }
+      });
+
+      const space = APP_STATE.activeBookingSpace || APP_STATE.spaces[0];
+      const baseRate = space.pricePerHour;
+      const baseTotal = baseRate * hours;
+      const grandTotal = Math.max(0, baseTotal + 5 - 5);
+
+      document.getElementById('calcHours').innerText = hours;
+      document.getElementById('calcRate').innerText = baseRate;
+      document.getElementById('calcBaseTotal').innerText = `₹${baseTotal.toFixed(2)}`;
+      document.getElementById('calcGrandTotal').innerText = `₹${grandTotal.toFixed(2)}`;
+    }
+
+    function handleConfirmBooking(e) {
+      e.preventDefault();
+      const space = APP_STATE.activeBookingSpace || APP_STATE.spaces[0];
+      const plate = document.getElementById('bookPlateNumber').value;
+      const hours = APP_STATE.selectedDurationHours;
+
+      closeBookingModal();
+
+      const token = `HS-${Math.floor(10000 + Math.random() * 90000)}`;
+      document.getElementById('passToken').innerText = token;
+      document.getElementById('passLocation').innerText = space.name;
+      document.getElementById('passVehicle').innerText = plate;
+      
+      const now = new Date();
+      now.setHours(now.getHours() + hours);
+      document.getElementById('passValidity').innerText = `Today, ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+
+      const qrContainer = document.getElementById('qrcode');
+      qrContainer.innerHTML = '';
+      new QRCode(qrContainer, {
+        text: `https://hourspot.ai/pass/${token}?spot=${encodeURIComponent(space.name)}&plate=${plate}`,
+        width: 150,
+        height: 150,
+        colorDark: '#0f172a',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.H
+      });
+
+      document.getElementById('qrModal').classList.remove('hidden');
+      showToast("Payment Successful! Digital QR Parking Pass Generated.");
+      lucide.createIcons();
+    }
+
+    function closeQRModal() {
+      document.getElementById('qrModal').classList.add('hidden');
+    }
+
+    function triggerDirections() {
+      const space = APP_STATE.activeBookingSpace || APP_STATE.spaces[0];
+      window.open(`https://www.google.com/maps/dir/?api=1&destination=${space.lat},${space.lng}`, '_blank');
+    }
+
+    // -------------------------------------------------------------
+    // Toast Notification System
+    // -------------------------------------------------------------
+    let toastTimeout;
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      const text = document.getElementById('toastMessage');
+      if (!toast || !text) return;
+
+      text.innerText = msg;
+      toast.classList.remove('hidden');
+      toast.classList.remove('translate-y-4');
+
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.classList.add('translate-y-4');
+        setTimeout(() => toast.classList.add('hidden'), 300);
+      }, 3500);
+    }
+
+    // -------------------------------------------------------------
+    // Initialization on DOM Load
+    // -------------------------------------------------------------
+    document.addEventListener('DOMContentLoaded', () => {
+      initMap();
+      renderSpacesList();
+      updateUserUI();
+      lucide.createIcons();
+    });
+  </script>
+</body>
+</html>
