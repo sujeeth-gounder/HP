@@ -1,0 +1,21 @@
+{
+  "name": "hourspot-smart-parking",
+  "version": "1.0.0",
+  "description": "HourSpot - Smart AI-Powered Peer-to-Peer Parking Platform",
+  "main": "index.html",
+  "scripts": {
+    "start": "python3 server.py",
+    "dev": "python3 server.py",
+    "build": "echo 'Static build ready'"
+  },
+  "keywords": [
+    "parking",
+    "smart-parking",
+    "ai",
+    "machine-learning",
+    "peer-to-peer",
+    "hourspot"
+  ],
+  "author": "HourSpot Team",
+  "license": "MIT"
+}
